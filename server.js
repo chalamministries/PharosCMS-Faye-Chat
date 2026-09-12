@@ -3,6 +3,8 @@ var path = require("path");
 var https = require("https");
 
 var express = require('express');
+var jwt = require("jsonwebtoken");
+
 var app = express();
 
 var faye = require('faye');
@@ -326,6 +328,28 @@ bayeux.on('publish', function(clientId, channel, data) {
 // ========================================
 // START SERVER
 // ========================================
+// --- BUBBLE COMPATIBLE AUTH ---
+bayeux.addExtension({
+  incoming: function(message, callback) {
+    // Only validate on handshake
+    if (message.channel === '/meta/handshake') {
+      const token = message.ext?.auth_token;
+      if (!token) {
+        return callback({ error: 'Missing ext.auth_token' });
+      }
+
+      try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+        // Attach user info to all future messages from this client
+        message.ext = { ...message.ext, user: payload };
+      } catch (err) {
+        return callback({ error: 'Invalid token' });
+      }
+    }
+    callback(message);
+  }
+});
+// --- END BUBBLE COMPATIBLE AUTH ---
 
 bayeux.attach(server);
 server.listen(2096, function() {
