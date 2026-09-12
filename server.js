@@ -9,7 +9,7 @@ var WebSocketServer = require('faye-websocket');
 // ========================================
 // SSL CERTIFICATE AUTO-RELOAD
 // ========================================
-const sslDir = '/home/admin/conf/web/api.pharoscms.com/ssl';
+const sslDir = './ssl';
 const certPath = path.join(sslDir, 'api.pharoscms.com.crt');
 const keyPath = path.join(sslDir, 'api.pharoscms.com.key');
 const caPath = path.join(sslDir, 'api.pharoscms.com.ca');
