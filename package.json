@@ -1,0 +1,19 @@
+{
+  "name": "pharos-faye-chat",
+  "version": "1.0.0",
+  "description": "Real-time chat server for PharosCMS, powered by Faye and WebSockets.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "faye": "^1.4.0",
+    "faye-websocket": "^0.11.4",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
