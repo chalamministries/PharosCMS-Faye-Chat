@@ -1,0 +1,26 @@
+[Unit]
+Description=PharosCMS Faye Chat Server
+After=network.target nginx.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/web/api.pharoscms.com/faye-chat
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=faye-chat
+Environment=NODE_ENV=production
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryLimit=256M
+
+[Install]
+WantedBy=multi-user.target
