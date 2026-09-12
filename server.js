@@ -1,5 +1,7 @@
 var fs = require('fs');
-var path = require("path");\nvar https = require('https');
+var path = require("path");
+var https = require("https");
+
 var express = require('express');
 var app = express();
 
