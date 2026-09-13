@@ -122,15 +122,12 @@ function getChatHistory(roomId, limit = 50) {
 // WEBSOCKET CHAT HANDLER
 // ========================================
 
-var server = https.createServer({
-  SNICallback: (servername, cb) => {
-    // Re-read certs on every TLS handshake (SNI)
-    const opts = getHttpsOptions();
-    cb(null, opts);
-  },
-  ...getHttpsOptions()
-}, app);
+var options = {
+  key: fs.readFileSync(keyPath),
+  cert: fs.readFileSync(certPath)
+};
 
+var server = https.createServer(options, app);
 var bayeux = new faye.NodeAdapter({mount: '/faye', timeout: 45});
 
 server.on('upgrade', function(request, socket, body) {
