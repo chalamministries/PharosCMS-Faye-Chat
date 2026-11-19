@@ -1,6 +1,7 @@
 var fs = require('fs');
 var path = require("path");
 var https = require("https");
+var http = require("http");
 
 var express = require('express');
 var jwt = require("jsonwebtoken");
@@ -13,7 +14,8 @@ var WebSocketServer = require('faye-websocket');
 // ========================================
 // SSL CERTIFICATE AUTO-RELOAD
 // ========================================
-const sslDir = './ssl';
+const sslDir = process.env.SSL_DIR || './ssl';
+const externalTLS = process.env.TLS_TERMINATION === 'proxy';
 const certPath = path.join(sslDir, 'api.pharoscms.com.crt');
 const keyPath = path.join(sslDir, 'api.pharoscms.com.key');
 const caPath = path.join(sslDir, 'api.pharoscms.com.ca');
@@ -45,8 +47,8 @@ function loadCerts() {
 }
 
 // Initial load
-let httpsOptions = loadCerts();
-if (!httpsOptions) {
+let httpsOptions = externalTLS ? null : loadCerts();
+if (!externalTLS && !httpsOptions) {
   console.error('[FATAL] Could not load initial SSL certificates. Exiting.');
   process.exit(1);
 }
@@ -122,12 +124,12 @@ function getChatHistory(roomId, limit = 50) {
 // WEBSOCKET CHAT HANDLER
 // ========================================
 
-var options = {
+var options = externalTLS ? null : {
   key: fs.readFileSync(keyPath),
   cert: fs.readFileSync(certPath)
 };
 
-var server = https.createServer(options, app);
+var server = externalTLS ? http.createServer(app) : https.createServer(options, app);
 var bayeux = new faye.NodeAdapter({mount: '/faye', timeout: 45});
 
 server.on('upgrade', function(request, socket, body) {
@@ -269,7 +271,6 @@ app.get('/health', function(req, res) {
 
 bayeux.addExtension({
   incoming: function(message, callback) {
-    console.log(Date.now(), "incoming", message);
     callback(message);
   },
   outgoing: function(message, callback) {
@@ -290,7 +291,7 @@ bayeux.on('subscribe', function(clientId, channel) {
 });
 
 bayeux.on('publish', function(clientId, channel, data) {
-  console.log('[Faye] Publish to', channel, ':', JSON.stringify(data).substring(0, 100));
+  console.log('[Faye] Publish to', channel);
 
   // Relay Faye messages to the custom WebSocket chat system
   if (channel.startsWith('/cases/') && channel.endsWith('/messages')) {
@@ -332,15 +333,19 @@ bayeux.addExtension({
     if (message.channel === '/meta/handshake') {
       const token = message.ext?.auth_token;
       if (!token) {
-        return callback({ error: 'Missing ext.auth_token' });
+        message.error = '401::Missing authentication token';
+        return callback(message);
       }
 
       try {
-        const payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+        const payload = jwt.verify(token, process.env.JWT_SECRET_KEY, {
+          algorithms: [process.env.JWT_ALGORITHM || 'HS256']
+        });
         // Attach user info to all future messages from this client
         message.ext = { ...message.ext, user: payload };
       } catch (err) {
-        return callback({ error: 'Invalid token' });
+        message.error = '401::Invalid authentication token';
+        return callback(message);
       }
     }
     callback(message);
@@ -349,10 +354,14 @@ bayeux.addExtension({
 // --- END BUBBLE COMPATIBLE AUTH ---
 
 bayeux.attach(server);
-server.listen(2096, function() {
+if (!process.env.JWT_SECRET_KEY) {
+  throw new Error('JWT_SECRET_KEY is required');
+}
+
+const port = Number(process.env.PORT || 2096);
+const host = process.env.HOST || '127.0.0.1';
+server.listen(port, host, function() {
   console.log('========================================');
-  console.log('Faye Server: https://api.pharoscms.com:2096/');
-  console.log('Chat WebSocket: wss://api.pharoscms.com:2096/chat');
-  console.log('Chat API: https://api.pharoscms.com:2096/api/');
+  console.log(`Faye listening on ${host}:${port}; TLS handled ${externalTLS ? 'by proxy' : 'in Node'}`);
   console.log('========================================');
 });
